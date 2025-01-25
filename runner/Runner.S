@@ -34,12 +34,13 @@ Main:
 	lea	$dff000,a3
 
 	bsr	CloseSystem
-	bsr	SetInitialState
-	bsr	SwapChipMemory
-	bsr	StartDemo
-	bsr	WaitLMBPressed
-	bsr	StopDemo
-	bsr	SwapChipMemory
+
+	move.l	$4.w,a6
+
+	; Run the core in supervisor mode
+	lea	SupervisorCore(pc),a5
+	jsr	_LVOSupervisor(a6)
+
 	bsr	WaitLMBReleased
 	bsr	OpenSystem
 
@@ -100,8 +101,7 @@ CloseSystem:
 	jsr	_LVOWaitTOF(a6)
 	jsr	_LVOWaitTOF(a6)
 
-	; Disable interrupts and DMA
-	move.w	#$4000,intena(a3)
+	; Disable DMA
 	move.w	#$01ff,dmacon(a3)
 	rts
 
@@ -115,9 +115,8 @@ OpenSystem:
 	; executing (now nonexistent) instructions from where it left off.
 	bsr	WaitVbl
 
-	; Enable DMA and interrupts
+	; Enable DMA
 	move.w	#$83e0,dmacon(a3)
-	move.w	#$c000,intena(a3)
 
 	; Restore system view
 	move.l	SystemView(pc),a1
@@ -126,6 +125,26 @@ OpenSystem:
 	; Release blitter
 	jsr	_LVODisownBlitter(a6)
 	rts
+
+
+SupervisorCore:
+	; Set interrupt level to 7 to prevent the demo from hijacking the CPU.
+	or.w	#$0700,sr
+
+	; Switch stack, in case the supervisor stack is in chip memory.
+	move.l	a7,a6
+	lea	Stack(pc),a7
+
+	bsr	SetInitialState
+	bsr	SwapChipMemory
+	bsr	StartDemo
+	bsr	WaitLMBPressed
+	bsr	StopDemo
+	bsr	SwapChipMemory
+
+	; Restore stack and return
+	move.l	a6,a7
+	rte
 
 SetInitialState:
 	; Turn off audio filter
@@ -167,6 +186,10 @@ StopDemo:
 	; Disable all DMA except blitter
 	move.w	#$05bf,dmacon(a3)
 	move.w	#$8240,dmacon(a3)
+
+	; Restore system default interrupt enable mask
+	move.w	#$1fd3,intena(a3)
+	move.w	#$e02c,intena(a3)
 
 	; Clear copper danger flag
 	move.w	#$0000,copcon(a3)
@@ -229,6 +252,9 @@ SystemView:
 	dc.l	0
 ReturnCode:
 	dc.l	0
+
+	ds.l	4
+Stack:
 
 	section	buffer,bss_f
 
