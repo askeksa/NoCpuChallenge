@@ -35,12 +35,22 @@ Main:
 
 	bsr	CloseSystem
 
+.restart:
 	move.l	$4.w,a6
 
 	; Run the core in supervisor mode
 	lea	SupervisorCore(pc),a5
 	jsr	_LVOSupervisor(a6)
 
+	; Reload and restart on RMB
+	tst.l	RestartFlag(pc)
+	beq.b	.norestart
+
+	bsr	LoadChipDataFile
+	tst.l	ReturnCode(pc)
+	beq.b	.restart
+
+.norestart:
 	bsr	WaitLMBReleased
 	bsr	OpenSystem
 
@@ -138,7 +148,7 @@ SupervisorCore:
 	bsr	SetInitialState
 	bsr	SwapChipMemory
 	bsr	StartDemo
-	bsr	WaitLMBPressed
+	bsr	WaitForExitSignal
 	bsr	StopDemo
 	bsr	SwapChipMemory
 
@@ -225,9 +235,19 @@ WaitBlit:
 	bne.b	.wait
 	rts
 
-WaitLMBPressed:
-.wait:	btst.b	#6,$bfe001
+WaitForExitSignal:
+	moveq.l	#0,d0
+.wait:
+	; Exit on LMB
+	btst.b	#6,$bfe001
+	beq.b	.exit
+
+	; Restart on RMB
+	btst.b	#10-8,potinp(a3)
 	bne.b	.wait
+	moveq.l	#1,d0
+.exit:
+	move.l	d0,RestartFlag
 	rts
 
 WaitLMBReleased:
@@ -251,6 +271,8 @@ GraphicsBase:
 SystemView:
 	dc.l	0
 ReturnCode:
+	dc.l	0
+RestartFlag:
 	dc.l	0
 
 	ds.l	4
