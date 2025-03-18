@@ -157,8 +157,9 @@ SupervisorCore:
 	rte
 
 SetInitialState:
-	; Turn off audio filter
+	; Turn off audio filter and modulations
 	bset.b	#1,$bfe001
+	move.w	#$000f,adkcon(a3)
 
 	; PAL mode, long frames
 	move.w	#$0020,beamcon0(a3)
