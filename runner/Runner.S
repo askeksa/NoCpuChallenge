@@ -243,6 +243,10 @@ WaitForExitSignal:
 	btst.b	#6,$bfe001
 	beq.b	.exit
 
+	; Exit if Blitter Nasty is cleared.
+	btst.b	#10-8,dmaconr(a3)
+	beq.b	.exit
+
 	; Restart on RMB
 	btst.b	#10-8,potinp(a3)
 	bne.b	.wait
