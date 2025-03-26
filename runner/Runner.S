@@ -149,7 +149,10 @@ SupervisorCore:
 	bsr	SwapChipMemory
 	bsr	StartDemo
 	bsr	WaitForExitSignal
+	bsr	WaitVbl
 	bsr	StopDemo
+	bsr	SetInitialState
+	bsr	WaitBlit
 	bsr	SwapChipMemory
 
 	; Restore stack and return
@@ -165,11 +168,11 @@ SetInitialState:
 	move.w	#$0020,beamcon0(a3)
 	move.w	#$8000,vposw(a3)
 
-	; Set OCS/ECS defaults
+	; Set OCS defaults
 	move.w	#$0200,bplcon0(a3)
 	move.w	#$0000,bplcon1(a3)
 	move.w	#$0024,bplcon2(a3)
-	move.w	#$0000,bplcon3(a3)
+	move.w	#$0c00,bplcon3(a3)
 	move.w	#$0011,bplcon4(a3)
 	move.w	#$0000,fmode(a3)
 
@@ -204,13 +207,6 @@ StopDemo:
 
 	; Clear copper danger flag
 	move.w	#$0000,copcon(a3)
-
-	; Black background
-	move.w	#$0000,bplcon3(a3)
-	move.w	#$000,color+0*2(a3)
-
-	; Wait for blitter to finish
-	bsr	WaitBlit
 	rts
 
 SwapChipMemory:
