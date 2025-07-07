@@ -2,7 +2,7 @@
 
 This is an open challenge to create demos that run entirely on the Amiga custom chips without involving the CPU.
 
-This repository contains the rules of the challenge, a [runner](runner) application for launching no-CPU demos, and an example [demo framework](demo) (in [Dart](https://dart.dev/)) for making no-CPU demos.
+This repository contains the rules of the challenge and a [runner](runner) application for launching no-CPU demos. This is intended as a standard specification of the no-CPU platform for demo competitions.
 
 ## Introduction
 
