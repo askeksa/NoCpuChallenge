@@ -1,10 +1,11 @@
 
 CHIP_MEMORY_ADDRESS = $000000
-CHIP_MEMORY_SIZE = $200000
 
 INITIAL_COPPER_ADDRESS = $000000
 
 	include dos/dos.i
+	include	exec/execbase.i
+	include	exec/memory.i
 	include	graphics/gfxbase.i
 	include	hardware/custom.i
 	include lvo/dos_lib.i
@@ -12,7 +13,7 @@ INITIAL_COPPER_ADDRESS = $000000
 	include lvo/graphics_lib.i
 
 
-	section main,code_f
+	section main,code
 
 Main:
 	move.l	$4.w,a6
@@ -27,8 +28,19 @@ Main:
 	jsr	_LVOOldOpenLibrary(a6)
 	move.l	d0,GraphicsBase
 
+	; Get chip memory size
+	move.l	MaxLocMem(a6),ChipMemorySize
+
+	; Allocate buffer
+	move.l	ChipMemorySize(pc),d0
+	move.l	#MEMF_CLEAR,d1
+	jsr	_LVOAllocMem(a6)
+	move.l	d0,ChipDataBuffer
+	beq.b	.exit
+
+	; Load memory image
 	bsr	LoadChipDataFile
-	tst.l	ReturnCode(pc)
+	move.l	ReturnCode(pc),d0
 	bne.b	.exit
 
 	lea	$dff000,a3
@@ -43,11 +55,11 @@ Main:
 	jsr	_LVOSupervisor(a6)
 
 	; Reload and restart on RMB
-	tst.l	RestartFlag(pc)
+	move.l	RestartFlag(pc),d0
 	beq.b	.norestart
 
 	bsr	LoadChipDataFile
-	tst.l	ReturnCode(pc)
+	move.l	ReturnCode(pc),d0
 	beq.b	.restart
 
 .norestart:
@@ -56,6 +68,14 @@ Main:
 
 .exit:
 	move.l	$4.w,a6
+
+	; Free buffer
+	move.l	ChipDataBuffer(pc),d0
+	beq.b	.nobuffer
+	move.l	d0,a1
+	move.l	ChipMemorySize(pc),d0
+	jsr	_LVOFreeMem(a6)
+.nobuffer:
 
 	; Close graphics.library
 	move.l	GraphicsBase(pc),a1
@@ -87,8 +107,8 @@ LoadChipDataFile:
 .open_ok:
 	; Read file contents
 	move.l	d4,d1
-	move.l	#ChipData,d2
-	move.l	#CHIP_MEMORY_SIZE,d3
+	move.l	ChipDataBuffer(pc),d2
+	move.l	ChipMemorySize(pc),d3
 	jsr	_LVORead(a6)
 
 	; Close file
@@ -210,9 +230,9 @@ StopDemo:
 	rts
 
 SwapChipMemory:
-	lea	ChipData,a0
+	move.l	ChipDataBuffer(pc),a0
 	lea	CHIP_MEMORY_ADDRESS,a1
-	move.l	#CHIP_MEMORY_SIZE,d1
+	move.l	ChipMemorySize(pc),d1
 .loop:	move.l	(a0),d0
 	move.l	(a1),(a0)+
 	move.l	d0,(a1)+
@@ -275,11 +295,10 @@ ReturnCode:
 	dc.l	0
 RestartFlag:
 	dc.l	0
+ChipMemorySize:
+	dc.l	0
+ChipDataBuffer:
+	dc.l	0
 
 	ds.l	4
 Stack:
-
-	section	buffer,bss_f
-
-ChipData:
-	ds.b	CHIP_MEMORY_SIZE
