@@ -4,28 +4,53 @@ This is an open challenge to create demos that run entirely on the Amiga custom 
 
 This repository contains the rules of the challenge and a [runner](runner) application for launching no-CPU demos. This is intended as a standard specification of the no-CPU platform for demo competitions.
 
-## Introduction
+There will be a dedicated no-CPU Amiga demo competition at **Gerp 2026**. In addition, this is an ongoing challenge - an invitation to explore a different kind of demo platform.
+
+Whenever you release a no-CPU demo, you are encouraged to write a comment about it on the [demo announcement issue](https://github.com/askeksa/NoCpuChallenge/issues/1).
+
+There's also a [FAQ](faq.md).
+
+## Background
 
 The Amiga custom chips (affectionately named **Alice**, **Lisa** and **Paula** in the AGA version of the chipset) were remarkably powerful for their time, enabling the Amiga computers - with their modestly-powered CPUs - to perform graphical and musical feats that required heavy computation on most contemporary platforms.
 
-This challenge aims to discover how just powerful these chips really are by exploring what they can do completely on their own, without the CPU even telling them what to do.
+This challenge aims to discover just how powerful these chips really are by exploring what they can do completely on their own, without the CPU even telling them what to do.
 
-The basic idea is to initialize the contents of chip memory to the demo payload, bring the hardware into a well-defined state (in particular, start the copper from a known address) and let the custom chips take it from there. This is feasible due to a number of crucial mechanisms:
+There have been several demo competitions in the past with a technical theme. Examples include [Atari zero bitplane](https://sommarhack.se/2024/compo.php#themed1), [Atari mixed-resolution](https://sommarhack.se/2025/compo.php#themed), [C64 only sprites](https://csdb.dk/event/?id=3003) and [C64 border only](https://csdb.dk/event/?id=3021). This is a similar idea for the Amiga - no CPU, custom chips only.
 
-- The copper can control all other relevant hardware components - bitplanes, sprites, audio, and the blitter - and can wait for the blitter to finish.
-- The copper can set the start addresses of the copper and can trigger jumps to these addresses.
-- The blitter can modify copper instructions.
+## Technical details
 
-The result is a Turing-complete system with its own unique (and hopefully fun) set of challenges. You are hereby invited to uncover its merits as a demo platform.
+A no-CPU demo takes the form of a raw memory image that specifies the initial contents of chip memory. Together with the initial state of the hardware registers (specified below) this memory image fully defines the demo.
 
-## Participation
+The memory image is loaded into memory by a [runner](runner) application, which serves as the demo executable. You can use the runner as is or modify it to your liking, but in order to qualify as a no-CPU demo according to this challenge, your chip memory image has to work with the official runner (with the same behavior).
 
-To take part in the challenge, do the following:
+The maximum size of the chip memory image depends on the targeted Amiga chipset: 512k for OCS, 1MB for ECS (or OCS with ECS Agnus and 512k expansion, the most common Amiga 500 configuration), and 2MB for AGA.
 
-- Make a no-CPU demo in the form of a chip memory image that works with the [official runner](runner). See the [detailed rules](rules.md) for further instructions.
-- Enter the demo into a suitable demo competition, or just release it out of compo if you wish. There will be a dedicated no-CPU Amiga demo compo at **[Gerp](https://gerp.traktor.group/) 2026**, where you can compete against similarly restricted demos.
-- Write a comment on the [demo announcement issue](https://github.com/askeksa/NoCpuChallenge/issues/1) about your demo.
+The audio filter is disabled. Since the filter is controlled via the CIA registers, which the copper does not have access to, the demo does not have the option of enabling the filter.
+
+The initial hardware register contents are as follows. Registers with ECS/AGA specific bits are generally initialized to their OCS defaults. This makes it easier to make a demo targeting OCS without worrying about AGA compatibility (as long as you are not using incompatible features, such as the 7 bitplane trick).
+
+| Register | Address   | Value   | Comment |
+|----------|-----------|--------:|---------|
+| VPOSW    | `$dff02a` | `$8000` | Long frames |
+| COPCON   | `$dff02e` | `$0002` | Copper danger flag set |
+| COP1LC   | `$dff080` | `$000000` | Copper initially starts at address 0 |
+| DMACON   | `$dff096` | `$87c0` | Bitplane, copper and blitter DMA enabled, sprite DMA disabled, blitter nasty set |
+| ADKCON   | `$dff09e` | `$xx00` | All modulation disabled |
+| BPLCON0  | `$dff100` | `$0200` | OCS default |
+| BPLCON1  | `$dff102` | `$0000` | OCS default |
+| BPLCON2  | `$dff104` | `$0024` | OCS default |
+| BPLCON3  | `$dff106` | `$0c00` | OCS default |
+| BPLCON4  | `$dff10c` | `$0011` | OCS default |
+| COLOR00  | `$dff180` | `$000`  | Black background |
+| BEAMCON0 | `$dff1dc` | `$0020` | PAL |
+| FMODE    | `$dff1fc` | `$0000` | OCS default |
+
+The values of all other registers are undefined.
+
+The demo can signal that it has ended by clearing the Blitter Nasty flag (i.e. by executing the copper instruction $0096,$0400). Depending on the hardware configuration, the runner may not actually be able to exit back to the OS, so the demo should still maintain a valid display.
 
 ## Feedback
 
 TBW
+
