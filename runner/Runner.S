@@ -358,7 +358,7 @@ DosName:
 GraphicsName:
 	dc.b	"graphics.library",0
 ChipDataFileName:
-	dc.b	"PROGDIR:chip.dat",0
+	dc.b	"chip.dat",0
 	even
 
 DosBase:
