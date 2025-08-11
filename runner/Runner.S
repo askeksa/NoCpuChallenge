@@ -148,6 +148,7 @@ LoadChipDataFile:
 	move.l	ChipBufferSize(pc),d2
 	move.l	ChipBuffer(pc),d3
 	jsr	_LVORead(a6)
+	move.l	d0,ChipDataSize
 
 	; Read mid memory contents
 	move.l	d4,d1
@@ -155,12 +156,14 @@ LoadChipDataFile:
 	move.l	ChipBufferSize(pc),d3
 	sub.l	ChipBuffer(pc),d3
 	jsr	_LVORead(a6)
+	add.l	d0,ChipDataSize
 
 	; Read high memory contents
 	move.l	d4,d1
 	move.l	ExtraBuffer(pc),d2
 	move.l	ExtraBufferSize(pc),d3
 	jsr	_LVORead(a6)
+	add.l	d0,ChipDataSize
 
 	; Close file
 	move.l	d4,d1
@@ -290,6 +293,11 @@ SwapChipMemoryIn:
 	move.l	ChipBufferSize(pc),a1
 	move.l	ExtraBufferSize(pc),d1
 	bsr	SwapMemory
+
+	move.l	ChipDataSize(pc),a1
+	move.l	ChipMemorySize(pc),d1
+	sub.l	a1,d1
+	bsr	BlitClear
 	rts
 
 SwapChipMemoryOut:
@@ -449,6 +457,8 @@ ChipBufferSize:
 ExtraBuffer:
 	dc.l	0
 ExtraBufferSize:
+	dc.l	0
+ChipDataSize:
 	dc.l	0
 
 	ds.l	4
