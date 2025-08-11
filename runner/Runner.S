@@ -183,7 +183,7 @@ CloseSystem:
 	jsr	_LVOWaitTOF(a6)
 
 	; Disable DMA
-	move.w	#$01ff,dmacon(a3)
+	move.w	#$01bf,dmacon(a3)
 	rts
 
 OpenSystem:
@@ -284,24 +284,35 @@ SwapChipMemoryIn:
 	move.l	ChipBufferSize(pc),a0
 	move.l	#CHIP_MEMORY_ADDRESS,a1
 	move.l	ChipBuffer(pc),d1
-	bsr	SwapMemory
-	move.l	ChipBufferSize(pc),a0
-	move.l	ExtraBuffer(pc),a1
+	bsr	BlitSwap
+
+	move.l	ExtraBuffer(pc),a0
+	move.l	ChipBufferSize(pc),a1
 	move.l	ExtraBufferSize(pc),d1
 	bsr	SwapMemory
 	rts
 
 SwapChipMemoryOut:
-	move.l	ChipBufferSize(pc),a0
-	move.l	ExtraBuffer(pc),a1
+	move.l	ExtraBuffer(pc),a0
+	move.l	ChipBufferSize(pc),a1
 	move.l	ExtraBufferSize(pc),d1
-	bsr	SwapMemory
+	bsr	CopyMemory
+
 	move.l	ChipBufferSize(pc),a0
 	move.l	#CHIP_MEMORY_ADDRESS,a1
 	move.l	ChipBuffer(pc),d1
-	bsr	SwapMemory
+	bsr	BlitCopy
 	rts
 
+CopyMemory:
+	; A0 = Source
+	; A1 = Dest
+	; D1 = Size
+	bra.b	.in
+.loop:	move.l	(a0)+,(a1)+
+.in:	subq.l	#4,d1
+	bge.b	.loop
+	rts
 
 SwapMemory:
 	; A0 = Source
@@ -351,6 +362,64 @@ WaitLMBReleased:
 .wait:	btst.b	#6,$bfe001
 	beq.b	.wait
 	rts
+
+
+BlitClear:
+	; A1 = Destination
+	; D1 = Size in bytes (must be even)
+	move.w	#$0100,d0
+	bra.b	Blit
+
+BlitCopy:
+	; A0 = Source
+	; A1 = Destination
+	; D1 = Size in bytes (must be even)
+	move.w	#$09f0,d0
+	bra.b	Blit
+
+BlitSwap:
+	; A0 = Source
+	; A1 = Destination
+	; D1 = Size in bytes (must be even)
+	move.w	#$0b5a,d0
+	bsr	Blit
+	exg.l	a0,a1
+	bsr	Blit
+	exg.l	a0,a1
+Blit:
+	; A0 = Source
+	; A1 = Destination
+	; D1 = Size in bytes (must be even)
+	; D0 = BLTCON0
+	bsr	WaitBlit
+	move.w	d0,bltcon0(a3)
+	move.w	#$0000,bltcon1(a3)
+	move.l	#$ffffffff,bltafwm(a3)
+	move.l	a1,bltcpt(a3)
+	move.l	a0,bltapt(a3)
+	move.l	a1,bltdpt(a3)
+	move.w	#0,bltcmod(a3)
+	move.w	#0,bltamod(a3)
+	move.w	#0,bltdmod(a3)
+
+	move.l	d1,d2
+	asr.l	#1,d2
+	bra.b	.bigin
+.big:	move.w	#0,bltsize(a3)
+	bsr	WaitBlit
+.bigin:	sub.l	#$10000,d2
+	bge.b	.big
+	moveq.l	#-64,d3
+	and.w	d2,d3
+	beq.b	.no1
+	move.w	d3,bltsize(a3)
+	bsr	WaitBlit
+.no1:	sub.w	d3,d2
+	beq.b	.no2
+	or.w	#64,d2
+	move.w	d2,bltsize(a3)
+	bsr	WaitBlit
+.no2:	rts
 
 
 DosName:
