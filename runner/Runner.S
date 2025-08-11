@@ -31,17 +31,47 @@ Main:
 	; Get chip memory size
 	move.l	MaxLocMem(a6),ChipMemorySize
 
-	; Allocate buffer
+	; Allocate largest available chip memory chunk
+	jsr	_LVOForbid(a6)
+	lea	MemList(a6),a0
+	moveq.l	#0,d0
+.findchip:
+	move.l	(a0),a0
+	btst.b	#MEMB_CHIP,MH_ATTRIBUTES+1(a0)
+	beq.b	.findchip
+	lea	MH_FIRST(a0),a0
+.findlargest:
+	move.l	(a0),a0
+	cmp.l	MC_BYTES(a0),d0
+	bgt.b	.notlargest
+	move.l	a0,a1
+	move.l	MC_BYTES(a0),d0
+.notlargest:
+	tst.l	(a0)
+	bne.b	.findlargest
+	move.l	d0,ChipBufferSize
+	jsr	_LVOAllocAbs(a6)
+	move.l	d0,ChipBuffer
+	jsr	_LVOPermit(a6)
+
+	; Check that chip buffer is at least as big as low memory
+	move.l	ChipBufferSize(pc),d0
+	cmp.l	ChipBuffer(pc),d0
+	blt.b	Exit
+
+	; Allocate extra buffer for saving used chip memory
 	move.l	ChipMemorySize(pc),d0
-	move.l	#MEMF_CLEAR,d1
+	sub.l	ChipBufferSize(pc),d0
+	move.l	d0,ExtraBufferSize
+	moveq.l	#0,d1
 	jsr	_LVOAllocMem(a6)
-	move.l	d0,ChipDataBuffer
-	beq.b	.exit
+	move.l	d0,ExtraBuffer
+	beq.b	Exit
 
 	; Load memory image
 	bsr	LoadChipDataFile
 	move.l	ReturnCode(pc),d0
-	bne.b	.exit
+	bne.b	Exit
 
 	lea	$dff000,a3
 
@@ -66,16 +96,24 @@ Main:
 	bsr	WaitLMBReleased
 	bsr	OpenSystem
 
-.exit:
+Exit:
 	move.l	$4.w,a6
 
-	; Free buffer
-	move.l	ChipDataBuffer(pc),d0
+	; Free extra buffer
+	move.l	ExtraBuffer(pc),d0
 	beq.b	.nobuffer
 	move.l	d0,a1
-	move.l	ChipMemorySize(pc),d0
+	move.l	ExtraBufferSize(pc),d0
 	jsr	_LVOFreeMem(a6)
 .nobuffer:
+
+	; Free chip
+	move.l	ChipBuffer(pc),d0
+	beq.b	.nochip
+	move.l	d0,a1
+	move.l	ChipBufferSize(pc),d0
+	jsr	_LVOFreeMem(a6)
+.nochip:
 
 	; Close graphics.library
 	move.l	GraphicsBase(pc),a1
@@ -105,10 +143,23 @@ LoadChipDataFile:
 	move.l	d0,ReturnCode
 	rts
 .open_ok:
-	; Read file contents
+	; Read low memory contents
 	move.l	d4,d1
-	move.l	ChipDataBuffer(pc),d2
-	move.l	ChipMemorySize(pc),d3
+	move.l	ChipBufferSize(pc),d2
+	move.l	ChipBuffer(pc),d3
+	jsr	_LVORead(a6)
+
+	; Read mid memory contents
+	move.l	d4,d1
+	move.l	ChipBuffer(pc),d2
+	move.l	ChipBufferSize(pc),d3
+	sub.l	ChipBuffer(pc),d3
+	jsr	_LVORead(a6)
+
+	; Read high memory contents
+	move.l	d4,d1
+	move.l	ExtraBuffer(pc),d2
+	move.l	ExtraBufferSize(pc),d3
 	jsr	_LVORead(a6)
 
 	; Close file
@@ -166,14 +217,14 @@ SupervisorCore:
 	lea	Stack(pc),a7
 
 	bsr	SetInitialState
-	bsr	SwapChipMemory
+	bsr	SwapChipMemoryIn
 	bsr	StartDemo
 	bsr	WaitForExitSignal
 	bsr	WaitVbl
 	bsr	StopDemo
 	bsr	SetInitialState
 	bsr	WaitBlit
-	bsr	SwapChipMemory
+	bsr	SwapChipMemoryOut
 
 	; Restore stack and return
 	move.l	a6,a7
@@ -229,16 +280,41 @@ StopDemo:
 	move.w	#$0000,copcon(a3)
 	rts
 
-SwapChipMemory:
-	move.l	ChipDataBuffer(pc),a0
-	lea	CHIP_MEMORY_ADDRESS,a1
-	move.l	ChipMemorySize(pc),d1
+SwapChipMemoryIn:
+	move.l	ChipBufferSize(pc),a0
+	move.l	#CHIP_MEMORY_ADDRESS,a1
+	move.l	ChipBuffer(pc),d1
+	bsr	SwapMemory
+	move.l	ChipBufferSize(pc),a0
+	move.l	ExtraBuffer(pc),a1
+	move.l	ExtraBufferSize(pc),d1
+	bsr	SwapMemory
+	rts
+
+SwapChipMemoryOut:
+	move.l	ChipBufferSize(pc),a0
+	move.l	ExtraBuffer(pc),a1
+	move.l	ExtraBufferSize(pc),d1
+	bsr	SwapMemory
+	move.l	ChipBufferSize(pc),a0
+	move.l	#CHIP_MEMORY_ADDRESS,a1
+	move.l	ChipBuffer(pc),d1
+	bsr	SwapMemory
+	rts
+
+
+SwapMemory:
+	; A0 = Source
+	; A1 = Dest
+	; D1 = Size
+	bra.b	.in
 .loop:	move.l	(a0),d0
 	move.l	(a1),(a0)+
 	move.l	d0,(a1)+
-	subq.l	#4,d1
-	bgt.b	.loop
+.in:	subq.l	#4,d1
+	bge.b	.loop
 	rts
+
 
 WaitVbl:
 .wait1:	btst.b	#0,vposr+1(a3)
@@ -297,7 +373,13 @@ RestartFlag:
 	dc.l	0
 ChipMemorySize:
 	dc.l	0
-ChipDataBuffer:
+ChipBuffer:
+	dc.l	0
+ChipBufferSize:
+	dc.l	0
+ExtraBuffer:
+	dc.l	0
+ExtraBufferSize:
 	dc.l	0
 
 	ds.l	4
