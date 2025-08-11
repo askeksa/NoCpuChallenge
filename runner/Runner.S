@@ -31,6 +31,13 @@ Main:
 	; Get chip memory size
 	move.l	MaxLocMem(a6),ChipMemorySize
 
+	; Detect only-chip config
+	moveq.l	#0,d0
+	cmp.l	#Main,ChipMemorySize
+	sgt.b	d0
+	neg.b	d0
+	move.l	d0,OnlyChip
+
 	; Allocate largest available chip memory chunk
 	jsr	_LVOForbid(a6)
 	lea	MemList(a6),a0
@@ -49,7 +56,10 @@ Main:
 .notlargest:
 	tst.l	(a0)
 	bne.b	.findlargest
-	move.l	d0,ChipBufferSize
+	move.l	OnlyChip(pc),d1
+	beq.b	.full
+	sub.l	#BOOTSTRAP_SIZE,d0
+.full:	move.l	d0,ChipBufferSize
 	jsr	_LVOAllocAbs(a6)
 	move.l	d0,ChipBuffer
 	jsr	_LVOPermit(a6)
@@ -60,6 +70,8 @@ Main:
 	blt.b	Exit
 
 	; Allocate extra buffer for saving used chip memory
+	move.l	OnlyChip(pc),d1
+	bne.b	.skip
 	move.l	ChipMemorySize(pc),d0
 	sub.l	ChipBufferSize(pc),d0
 	move.l	d0,ExtraBufferSize
@@ -67,7 +79,7 @@ Main:
 	jsr	_LVOAllocMem(a6)
 	move.l	d0,ExtraBuffer
 	beq.b	Exit
-
+.skip:
 	; Load memory image
 	bsr	LoadChipDataFile
 	move.l	ReturnCode(pc),d0
@@ -76,6 +88,10 @@ Main:
 	lea	$dff000,a3
 
 	bsr	CloseSystem
+
+	; If only chip, copy and run bootstrap code
+	move.l	OnlyChip(pc),d1
+	bne.b	OnlyChipMain
 
 .restart:
 	move.l	$4.w,a6
@@ -128,6 +144,23 @@ Exit:
 	rts
 
 
+OnlyChipMain:
+	lea	Bootstrap_End(pc),a0
+	move.l	ChipMemorySize(pc),a1
+	lea	BootstrapSupervisorCore-Bootstrap_End(a1),a5
+	moveq.l	#BOOTSTRAP_SIZE/4-1,d1
+.copy:	move.l	-(a0),-(a1)
+	dbf	d1,.copy
+
+	move.l	$4.w,a6
+	cmp.w	#37,LIB_VERSION(a6)
+	blt.b	.noflush
+	jsr	_LVOCacheClearU(a6)
+.noflush:
+	jsr	_LVOSupervisor(a6)
+	; No return to here
+
+
 LoadChipDataFile:
 	move.l	DosBase(pc),a6
 
@@ -158,13 +191,21 @@ LoadChipDataFile:
 	jsr	_LVORead(a6)
 	add.l	d0,ChipDataSize
 
+	; Stop here if only chip
+	move.l	OnlyChip(pc),d1
+	beq.b	.extra
+	cmp.l	d3,d0
+	blt.b	.close
+	move.l	#ERROR_NO_FREE_STORE,ReturnCode
+	bra.b	.close
+.extra:
 	; Read high memory contents
 	move.l	d4,d1
 	move.l	ExtraBuffer(pc),d2
 	move.l	ExtraBufferSize(pc),d3
 	jsr	_LVORead(a6)
 	add.l	d0,ChipDataSize
-
+.close:
 	; Close file
 	move.l	d4,d1
 	jsr	_LVOClose(a6)
@@ -335,18 +376,6 @@ SwapMemory:
 	rts
 
 
-WaitVbl:
-.wait1:	btst.b	#0,vposr+1(a3)
-	beq.b	.wait1
-.wait2:	btst.b	#0,vposr+1(a3)
-	bne.b	.wait2
-	rts
-
-WaitBlit:
-.wait:	btst.b	#14-8,dmaconr(a3)
-	bne.b	.wait
-	rts
-
 WaitForExitSignal:
 	moveq.l	#0,d0
 .wait:
@@ -370,6 +399,52 @@ WaitLMBReleased:
 .wait:	btst.b	#6,$bfe001
 	beq.b	.wait
 	rts
+
+
+Bootstrap_Begin:
+
+BootstrapSupervisorCore:
+	; Set interrupt level to 7 to prevent the demo from hijacking the CPU.
+	or.w	#$0700,sr
+
+	; Switch stack
+	lea	Stack(pc),a7
+
+	jsr	SetInitialState
+
+	; Copy low memory data
+	move.l	ChipBufferSize(pc),a0
+	move.l	#CHIP_MEMORY_ADDRESS,a1
+	move.l	ChipBuffer(pc),d1
+	bsr	BlitCopy
+
+	; Clear until bootstrap code
+	move.l	ChipDataSize(pc),a1
+	move.l	ChipMemorySize(pc),d1
+	sub.l	#BOOTSTRAP_SIZE,d1
+	sub.l	a1,d1
+	bsr	BlitClear
+
+	; Set dummy copper start address and wait for copper to latch it
+	lea	DummyCopper(pc),a0
+	move.l	a0,cop1lc(a3)
+	bsr	WaitVbl
+
+	; Set copper danger flag
+	move.w	#$0002,copcon(a3)
+
+	; Enable bitplane, copper and blitter DMA. Set Blitter Nasty to
+	; prevent the CPU from interfering with the demo.
+	move.w	#$87c0,dmacon(a3)
+
+	; Clear bootstrap code
+	move.w	#(BOOTSTRAP_SIZE<<(6-3))+4,bltsize(a3)
+
+	; Set initial copper start address
+	move.l	#INITIAL_COPPER_ADDRESS,cop1lc(a3)
+
+	; Stop
+	stop	#$2700
 
 
 BlitClear:
@@ -430,6 +505,42 @@ Blit:
 .no2:	rts
 
 
+WaitVbl:
+.wait1:	btst.b	#0,vposr+1(a3)
+	beq.b	.wait1
+.wait2:	btst.b	#0,vposr+1(a3)
+	bne.b	.wait2
+	rts
+
+WaitBlit:
+.wait:	btst.b	#14-8,dmaconr(a3)
+	bne.b	.wait
+	rts
+
+DummyCopper:
+	dc.l	$fffffffe
+
+	ds.l	4
+Stack:
+
+ChipMemorySize:
+	dc.l	0
+ChipBuffer:
+	dc.l	0
+ChipBufferSize:
+	dc.l	0
+ExtraBuffer:
+	dc.l	0
+ExtraBufferSize:
+	dc.l	0
+ChipDataSize:
+	dc.l	0
+
+Bootstrap_End:
+
+BOOTSTRAP_SIZE	=	(Bootstrap_End-Bootstrap_Begin+7)&-8
+
+
 DosName:
 	dc.b	"dos.library",0
 GraphicsName:
@@ -448,18 +559,5 @@ ReturnCode:
 	dc.l	0
 RestartFlag:
 	dc.l	0
-ChipMemorySize:
+OnlyChip:
 	dc.l	0
-ChipBuffer:
-	dc.l	0
-ChipBufferSize:
-	dc.l	0
-ExtraBuffer:
-	dc.l	0
-ExtraBufferSize:
-	dc.l	0
-ChipDataSize:
-	dc.l	0
-
-	ds.l	4
-Stack:
