@@ -145,6 +145,10 @@ Exit:
 
 
 OnlyChipMain:
+	; Do Not Disturb
+	move.w	#$4000,intena(a3)
+
+	; Copy bootstrap code
 	lea	Bootstrap_End(pc),a0
 	move.l	ChipMemorySize(pc),a1
 	lea	BootstrapSupervisorCore-Bootstrap_End(a1),a5
@@ -152,6 +156,7 @@ OnlyChipMain:
 .copy:	move.l	-(a0),-(a1)
 	dbf	d1,.copy
 
+	; Run bootstrap code
 	move.l	$4.w,a6
 	cmp.w	#37,LIB_VERSION(a6)
 	blt.b	.noflush
@@ -165,7 +170,16 @@ LoadChipDataFile:
 	move.l	DosBase(pc),a6
 
 	; Open chip ram data file
+	moveq.l	#0,d5
 	move.l	#ChipDataFileName,d1
+	move.l	#MODE_OLDFILE,d2
+	jsr	_LVOOpen(a6)
+	move.l	d0,d4
+	bne.b	.open_ok
+
+	; Try compressed
+	moveq.l	#1,d5
+	move.l	#CompressedChipDataFileName,d1
 	move.l	#MODE_OLDFILE,d2
 	jsr	_LVOOpen(a6)
 	move.l	d0,d4
@@ -176,6 +190,8 @@ LoadChipDataFile:
 	move.l	d0,ReturnCode
 	rts
 .open_ok:
+	move.l	d5,Compressed
+
 	; Read low memory contents
 	move.l	d4,d1
 	move.l	ChipBufferSize(pc),d2
@@ -335,6 +351,9 @@ SwapChipMemoryIn:
 	move.l	ExtraBufferSize(pc),d1
 	bsr	SwapMemory
 
+	move.l	ChipMemorySize(pc),a0
+	bsr	Decompress
+
 	move.l	ChipDataSize(pc),a1
 	move.l	ChipMemorySize(pc),d1
 	sub.l	a1,d1
@@ -418,6 +437,11 @@ BootstrapSupervisorCore:
 	move.l	ChipBuffer(pc),d1
 	bsr	BlitCopy
 
+	; Decompress if compressed
+	move.l	ChipMemorySize(pc),a0
+	lea	-BOOTSTRAP_SIZE(a0),a0
+	bsr	Decompress
+
 	; Clear until bootstrap code
 	move.l	ChipDataSize(pc),a1
 	move.l	ChipMemorySize(pc),d1
@@ -430,12 +454,11 @@ BootstrapSupervisorCore:
 	move.l	a0,cop1lc(a3)
 	bsr	WaitVbl
 
+	; Enable DMAs.
+	move.w	#$87c0,dmacon(a3)
+
 	; Set copper danger flag
 	move.w	#$0002,copcon(a3)
-
-	; Enable bitplane, copper and blitter DMA. Set Blitter Nasty to
-	; prevent the CPU from interfering with the demo.
-	move.w	#$87c0,dmacon(a3)
 
 	; Clear bootstrap code
 	move.w	#(BOOTSTRAP_SIZE<<(6-3))+4,bltsize(a3)
@@ -517,11 +540,34 @@ WaitBlit:
 	bne.b	.wait
 	rts
 
+
+Decompress:
+	; A0 = End of space
+
+	move.l	Compressed(pc),d0
+	beq.b	.not
+
+	move.l	ChipDataSize(pc),d0
+	addq.l	#3,d0
+	and.w	#-4,d0
+	move.l	d0,a1
+
+.move:	move.l	-(a1),-(a0)
+	move.l	a1,d0
+	bne.b	.move
+
+	bsr	zx0_decompress
+
+	lea	ChipDataSize(pc),a0
+	move.l	a1,(a0)
+.not:
+	rts
+
+	include	NC:runner/unzx0_68000.S
+
+
 DummyCopper:
 	dc.l	$fffffffe
-
-	ds.l	4
-Stack:
 
 ChipMemorySize:
 	dc.l	0
@@ -529,12 +575,13 @@ ChipBuffer:
 	dc.l	0
 ChipBufferSize:
 	dc.l	0
-ExtraBuffer:
-	dc.l	0
-ExtraBufferSize:
-	dc.l	0
 ChipDataSize:
 	dc.l	0
+Compressed:
+	dc.l	0
+
+	ds.l	5
+Stack:
 
 Bootstrap_End:
 
@@ -547,6 +594,8 @@ GraphicsName:
 	dc.b	"graphics.library",0
 ChipDataFileName:
 	dc.b	"chip.dat",0
+CompressedChipDataFileName:
+	dc.b	"chip.zx0",0
 	even
 
 DosBase:
@@ -560,4 +609,8 @@ ReturnCode:
 RestartFlag:
 	dc.l	0
 OnlyChip:
+	dc.l	0
+ExtraBuffer:
+	dc.l	0
+ExtraBufferSize:
 	dc.l	0
