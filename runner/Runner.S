@@ -1,7 +1,8 @@
 
 CHIP_MEMORY_ADDRESS = $000000
-
 INITIAL_COPPER_ADDRESS = $000000
+
+TEXT_BUFFER_SIZE = 3000
 
 	include dos/dos.i
 	include	exec/execbase.i
@@ -28,7 +29,11 @@ Main:
 	jsr	_LVOOldOpenLibrary(a6)
 	move.l	d0,GraphicsBase
 
+	; Print demo text
+	bsr	PrintDemoText
+
 	; Get chip memory size
+	move.l	$4.w,a6
 	move.l	MaxLocMem(a6),ChipMemorySize
 
 	; Detect only-chip config
@@ -164,6 +169,50 @@ OnlyChipMain:
 .noflush:
 	jsr	_LVOSupervisor(a6)
 	; No return to here
+
+
+PrintDemoText:
+	move.l	DosBase(pc),a6
+
+	; Get output
+	jsr	_LVOOutput(a6)
+	move.l	d0,d5
+	beq.b	.no_text
+
+	; Open file
+	move.l	#DemoTextFileName,d1
+	move.l	#MODE_OLDFILE,d2
+	jsr	_LVOOpen(a6)
+	move.l	d0,d4
+	beq.b	.no_text
+
+	; Allocate buffer on stack
+	lea	-TEXT_BUFFER_SIZE(a7),a7
+.print:
+	; Read text
+	move.l	d4,d1
+	move.l	a7,d2
+	move.l	#TEXT_BUFFER_SIZE,d3
+	jsr	_LVORead(a6)
+	move.l	d0,d3
+	ble.b	.done
+
+	; Print text
+	move.l	d5,d1
+	move.l	a7,d2
+	jsr	_LVOWrite(a6)
+
+	cmp.l	#TEXT_BUFFER_SIZE,d3
+	beq.b	.print
+.done:
+	; Deallocate buffer
+	lea	TEXT_BUFFER_SIZE(a7),a7
+
+	; Close file
+	move.l	d4,d1
+	jsr	_LVOClose(a6)
+.no_text:
+	rts
 
 
 LoadChipDataFile:
@@ -592,6 +641,8 @@ DosName:
 	dc.b	"dos.library",0
 GraphicsName:
 	dc.b	"graphics.library",0
+DemoTextFileName:
+	dc.b	"demo.txt",0
 ChipDataFileName:
 	dc.b	"chip.dat",0
 CompressedChipDataFileName:

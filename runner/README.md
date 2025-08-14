@@ -2,6 +2,8 @@
 
 This is an application for loading a chip memory image into memory and running it with a well-defined [initial state](../README.md#technical-details). It forms the main demo executable in the distribution of a no-CPU demo.
 
+If there is a file called `demo.txt` in the current directory, it is read and printed as the first thing.
+
 The memory image is read from a file called `chip.dat` in the current directory. Optionally, it can be compressed using the [ZX0](https://github.com/einar-saukas/ZX0) V2 format and read from `chip.zx0` instead.
 
 The contents of the file are read into chip memory (and optionally decompressed) starting at address 0. If the (decompressed) file is smaller than the size of chip memory, the rest of chip memory is cleared.
