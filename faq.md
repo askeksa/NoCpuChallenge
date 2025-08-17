@@ -16,9 +16,15 @@ A demo can progress through its timeline by having one copperlist per frame, wit
 
 Of course, the CPU is needed to load the demo into memory. This challenge setup abstracts away the loading and regards the machine as having initialized memory and no CPU.
 
-## Why allow the AGA chipset when OCS is all the rage these days?
+## Why focus on the AGA chipset when OCS is all the rage these days?
 
-TBW
+I chose to open the challenge to all Amiga chipsets and to focus on AGA in the narrative of the challenge demo for several reasons:
+
+- I find that AGA is grossly underutilized in demos. The period from when the AGA chipset was introduced until the "chunky era," when faster CPUs became mainstream, was only a few years; as a consequence, few demos were made that really take advantage of AGA features in a hardware-centric way. The no-CPU approach is an opportunity to rectify this.
+
+- With the CPU out of the picture, OCS doesn’t really provide any interesting challenges compared to AGA. It is no easier or simpler to make no-CPU effects on AGA, as the basic copper/blitter dance is the same. You can just do more with it, due to the additional memory, more bitplanes, less DMA load, wider sprites, and flexible color assignment.
+
+- An Amiga with the CPU turned off is a new platform and thus not bound by any traditions or a fixed reference. Let’s uncover everything it has to offer.
 
 ## How does this challenge relate to Bifat's [Dogma Demomaking](https://www.pouet.net/topic.php?which=12670&page=1) challenge?
 
