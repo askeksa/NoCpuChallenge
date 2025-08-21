@@ -1,4 +1,4 @@
-# Foreseeably Asked Questions
+# Frequently Asked Questions
 
 ## How is it possible to make a demo without using the CPU??
 
@@ -16,9 +16,11 @@ A demo can progress through its timeline by having one copperlist per frame, wit
 
 Of course, the CPU is needed to load the demo into memory. This challenge setup abstracts away the loading and regards the machine as having initialized memory and no CPU.
 
-## Why focus on the AGA chipset when OCS is all the rage these days?
+## Is the challenge for OCS or AGA?
 
-I chose to open the challenge to all Amiga chipsets and to focus on AGA in the narrative of the challenge demo for several reasons:
+Both. You decide which Amiga model to target.
+
+I chose to focus on AGA in the narrative of the challenge demo for several reasons:
 
 - I find that AGA is grossly underutilized in demos. The period from when the AGA chipset was introduced until the "chunky era," when faster CPUs became mainstream, was only a few years; as a consequence, few demos were made that really take advantage of AGA features in a hardware-centric way. The no-CPU approach is an opportunity to rectify this.
 
@@ -44,4 +46,6 @@ I have had the idea of a no-CPU Amiga demo competition for several years and men
 
 [A](https://www.pouet.net/prod.php?which=104004) [few](https://www.pouet.net/prod.php?which=104025) demos made using Copper Showdown have been released in 2025, independently of this challenge.
 
-I am not aware of any no-CPU demos being released before 2025.
+A blitter implementation of Game of Life was made by Tomas Rokicki [in 1986](https://usenet.trashworldnews.com/?thread=245812). In 2024, [Piru](https://github.com/piruhttps://github.com/piru) released a [proof-of-concept implementation](https://infosec.exchange/@harrysintonen/112627238742582618) driven by the copper without CPU involvement, demonstrating the Turing completeness of the copper/blitter system.
+
+I am not aware of any no-CPU demos being released before 2024.
