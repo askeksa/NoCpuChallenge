@@ -1,6 +1,9 @@
 
 CHIP_MEMORY_ADDRESS = $000000
 MEMORY_REGION_MASK = $FFF80000
+HALF_MEG = $80000
+ONE_MEG = $100000
+FAKEFAST_ADDRESS = $C00000
 INITIAL_COPPER_ADDRESS = $000000
 
 TEXT_BUFFER_SIZE = 1000
@@ -18,6 +21,8 @@ TEXT_BUFFER_SIZE = 1000
 	section main,code
 
 Main:
+	lea	$dff000,a3
+
 	move.l	$4.w,a6
 
 	; Open dos.library
@@ -44,6 +49,24 @@ Main:
 	neg.b	d0
 	move.l	d0,OnlyChip
 
+	; Detect A500 fake-chip config
+	moveq.l	#0,d0
+	; Half a meg of official chip memory
+	cmp.l	#HALF_MEG,ChipMemorySize
+	bne.b	.notfakechip
+	; Extra memory at C0
+	move.l	#Main,d1
+	and.l	#MEMORY_REGION_MASK,d1
+	cmp.l	#FAKEFAST_ADDRESS,d1
+	bne.b	.notfakechip
+	; ECS Agnus
+	btst.b	#13-8,vposr(a3)
+	beq.b	.notfakechip
+	move.l	#ONE_MEG,ChipMemorySize
+	moveq.l	#1,d0
+.notfakechip:
+	move.l	d0,FakeChip
+
 	; Allocate largest available chip memory chunk
 	move.l	#CHIP_MEMORY_ADDRESS,a2
 	bsr	AllocateLargest
@@ -55,6 +78,15 @@ Main:
 	cmp.l	ChipBuffer(pc),d0
 	blt.b	Exit
 
+	; Allocate largest available fakefast memory chunk
+	move.l	FakeChip(pc),d1
+	beq.b	.skipfakechip
+	move.l	#FAKEFAST_ADDRESS,a2
+	bsr	AllocateLargest
+	move.l	d0,ExtraBuffer
+	move.l	d2,ExtraBufferSize
+	bra.b	.skip
+.skipfakechip:
 	; Allocate extra buffer for saving used chip memory
 	move.l	OnlyChip(pc),d1
 	bne.b	.skip
@@ -71,13 +103,12 @@ Main:
 	move.l	ReturnCode(pc),d0
 	bne.b	Exit
 
-	lea	$dff000,a3
-
 	bsr	CloseSystem
 
-	; If only chip, copy and run bootstrap code
+	; If only chip or fakechip, copy and run bootstrap code
 	move.l	OnlyChip(pc),d1
-	bne.b	OnlyChipMain
+	or.l	FakeChip(pc),d1
+	bne.b	NoExit
 
 .restart:
 	move.l	$4.w,a6
@@ -130,13 +161,17 @@ Exit:
 	rts
 
 
-OnlyChipMain:
+NoExit:
 	; Do Not Disturb
 	move.w	#$4000,intena(a3)
 
 	; Copy bootstrap code
 	lea	Bootstrap_End(pc),a0
 	move.l	ChipMemorySize(pc),a1
+	move.l	FakeChip(pc),d1
+	beq.b	.notfakechip
+	move.l	#FAKEFAST_ADDRESS+HALF_MEG,a1
+.notfakechip:
 	lea	BootstrapSupervisorCore-Bootstrap_End(a1),a5
 	moveq.l	#BOOTSTRAP_SIZE/4-1,d1
 .copy:	move.l	-(a0),-(a1)
@@ -269,11 +304,7 @@ LoadChipDataFile:
 
 	; Stop here if only chip
 	move.l	OnlyChip(pc),d1
-	beq.b	.extra
-	cmp.l	d3,d0
-	blt.b	.close
-	move.l	#ERROR_NO_FREE_STORE,ReturnCode
-	bra.b	.close
+	bne.b	.check
 .extra:
 	; Read high memory contents
 	move.l	d4,d1
@@ -281,6 +312,15 @@ LoadChipDataFile:
 	move.l	ExtraBufferSize(pc),d3
 	jsr	_LVORead(a6)
 	add.l	d0,ChipDataSize
+.check:
+	; Check that the entire file was read
+	move.l	d4,d1
+	move.l	#ReturnCode,d2
+	moveq.l	#1,d3
+	jsr	_LVORead(a6)
+	tst.l	d0
+	beq.b	.close
+	move.l	#ERROR_NO_FREE_STORE,ReturnCode
 .close:
 	; Close file
 	move.l	d4,d1
@@ -497,6 +537,15 @@ BootstrapSupervisorCore:
 	move.l	ChipBuffer(pc),d1
 	bsr	BlitCopy
 
+	; Copy high memory data
+	move.l	FakeChip(pc),d1
+	beq.b	.notfakechip
+	move.l	ExtraBuffer(pc),a0
+	add.l	#HALF_MEG-FAKEFAST_ADDRESS,a0
+	move.l	ChipBufferSize(pc),a1
+	move.l	ExtraBufferSize(pc),d1
+	bsr	BlitCopy
+.notfakechip:
 	; Decompress if compressed
 	move.l	ChipMemorySize(pc),a0
 	lea	-BOOTSTRAP_SIZE(a0),a0
@@ -510,7 +559,8 @@ BootstrapSupervisorCore:
 	bsr	BlitClear
 
 	; Set dummy copper start address and wait for copper to latch it
-	lea	DummyCopper(pc),a0
+	move.l	ChipMemorySize(pc),a0
+	add.l	#DummyCopper-Bootstrap_End,a0
 	move.l	a0,cop1lc(a3)
 	bsr	WaitVbl
 
@@ -637,6 +687,12 @@ ChipBufferSize:
 	dc.l	0
 ChipDataSize:
 	dc.l	0
+ExtraBuffer:
+	dc.l	0
+ExtraBufferSize:
+	dc.l	0
+FakeChip:
+	dc.l	0
 Compressed:
 	dc.l	0
 
@@ -671,8 +727,4 @@ ReturnCode:
 RestartFlag:
 	dc.l	0
 OnlyChip:
-	dc.l	0
-ExtraBuffer:
-	dc.l	0
-ExtraBufferSize:
 	dc.l	0
