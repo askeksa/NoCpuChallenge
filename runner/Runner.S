@@ -1,5 +1,6 @@
 
 CHIP_MEMORY_ADDRESS = $000000
+MEMORY_REGION_MASK = $FFF80000
 INITIAL_COPPER_ADDRESS = $000000
 
 TEXT_BUFFER_SIZE = 1000
@@ -44,30 +45,10 @@ Main:
 	move.l	d0,OnlyChip
 
 	; Allocate largest available chip memory chunk
-	jsr	_LVOForbid(a6)
-	lea	MemList(a6),a0
-	moveq.l	#0,d0
-.findchip:
-	move.l	(a0),a0
-	btst.b	#MEMB_CHIP,MH_ATTRIBUTES+1(a0)
-	beq.b	.findchip
-	lea	MH_FIRST(a0),a0
-.findlargest:
-	move.l	(a0),a0
-	cmp.l	MC_BYTES(a0),d0
-	bgt.b	.notlargest
-	move.l	a0,a1
-	move.l	MC_BYTES(a0),d0
-.notlargest:
-	tst.l	(a0)
-	bne.b	.findlargest
-	move.l	OnlyChip(pc),d1
-	beq.b	.full
-	sub.l	#BOOTSTRAP_SIZE,d0
-.full:	move.l	d0,ChipBufferSize
-	jsr	_LVOAllocAbs(a6)
+	move.l	#CHIP_MEMORY_ADDRESS,a2
+	bsr	AllocateLargest
 	move.l	d0,ChipBuffer
-	jsr	_LVOPermit(a6)
+	move.l	d2,ChipBufferSize
 
 	; Check that chip buffer is at least as big as low memory
 	move.l	ChipBufferSize(pc),d0
@@ -169,6 +150,36 @@ OnlyChipMain:
 .noflush:
 	jsr	_LVOSupervisor(a6)
 	; No return to here
+
+
+AllocateLargest:
+	; A2 = Memory region address
+	jsr	_LVOForbid(a6)
+	lea	MemList(a6),a0
+	moveq.l	#0,d0
+.findregion:
+	move.l	(a0),a0
+	move.l	MH_LOWER(a0),d1
+	and.l	#MEMORY_REGION_MASK,d1
+	cmp.l	a2,d1
+	bne.b	.findregion
+	lea	MH_FIRST(a0),a0
+.findlargest:
+	move.l	(a0),a0
+	cmp.l	MC_BYTES(a0),d0
+	bgt.b	.notlargest
+	move.l	a0,a1
+	move.l	MC_BYTES(a0),d0
+.notlargest:
+	tst.l	(a0)
+	bne.b	.findlargest
+	move.l	OnlyChip(pc),d1
+	beq.b	.full
+	sub.l	#BOOTSTRAP_SIZE,d0
+.full:	move.l	d0,d2
+	jsr	_LVOAllocAbs(a6)
+	jsr	_LVOPermit(a6)
+	rts
 
 
 PrintDemoText:
