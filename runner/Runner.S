@@ -2,7 +2,7 @@
 CHIP_MEMORY_ADDRESS = $000000
 INITIAL_COPPER_ADDRESS = $000000
 
-TEXT_BUFFER_SIZE = 3000
+TEXT_BUFFER_SIZE = 1000
 
 	include dos/dos.i
 	include	exec/execbase.i
