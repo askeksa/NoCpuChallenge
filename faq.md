@@ -28,6 +28,24 @@ I chose to focus on AGA in the narrative of the challenge demo for several reaso
 
 - An Amiga with the CPU turned off is a new platform and thus not bound by any traditions or a fixed reference. Let’s uncover everything it has to offer.
 
+## How can I make a demo that works on all Amiga chipsets?
+
+A chip memory image made for OCS/ECS should generally also work on AGA as long as you stay away from incompatibilities between the chipsets. The incompatibilities that you are most likely to run into are probably:
+
+1. If you set 7 bitplanes on OCS/ECS, you get a 6 bitplane mode (i.e. EHB, HAM or DPF) with only 4 bitplanes of DMA. On AGA, you just get 7 bitplanes.
+2. When you write to a color register, the change takes effect 70ns later on AGA. So if you change a color while it is being displayed, the boundary between the colors will be positioned one hires pixel further to the right on AGA compared to OCS/ECS.
+3. On OCS/ECS, a blitter wait for any blit that uses the D channel will complete two cycles earlier than on AGA. This [does not cause any problems in a no-CPU setting](https://eab.abime.net/showthread.php?t=104887), but it does mean that if you depend on the exact cycle at which a blit completes, or you have many blits back to back on a very tight time schedule, you may see different results on AGA.
+
+If you want to run different code depending on the chipset, you can use the blitter wait latency difference to detect the chipset at runtime. Simply run this copperlist snippet during the vblank:
+```
+    dc.l    $00E100FE ; Wait for the last cycle on the scanline
+    dc.l    $004003AA,$00420000 ; C->D blit
+    dc.l    $00480000,$004A0000,$00540000,$00560000 ; Point C and D to the same address
+    dc.l    $00580041,$00010000 ; Run a one-word blit and wait for it to complete
+    dc.l    $003100FF ; Inspect the current horizontal raster position
+```
+The subsequent copper instruction will be executed on OCS/ECS but skipped on AGA.
+
 ## How does this challenge relate to Bifat's [Dogma Demomaking](https://www.pouet.net/topic.php?which=12670&page=1) challenge?
 
 The two challenges are unrelated, but compatible. It is absolutely possible to make a no-CPU demo on an Amiga. This might even be a rather pleasant experience, since the demo is unlikely to crash the system during development, due to the sandboxing of the runner.
