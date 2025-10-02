@@ -56,5 +56,6 @@ The demo can signal that it has ended by clearing the Blitter Nasty flag (i.e. b
 
 If you have questions or comments, you are welcome to [open an issue](https://github.com/askeksa/NoCpuChallenge/issues/new). I am particularly interested in feedback in these areas:
 
+- If there are any bugs or missing features in the runner that makes it unsuitable as the main executable for your demo.
 - If there is something in the rules or the runner that you think puts undue limits on what no-CPU demos can do under this formalism.
 - If you find a security hole in the runner sandbox, enabling a demo to reactivate the CPU.

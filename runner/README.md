@@ -17,3 +17,5 @@ The runner will exit if the left mouse button is pressed, or if the demo clears 
 If the right mouse button is pressed, the runner will reload the memory image and start over. This can be used for quick testing of new versions during demo development by placing the `chip.dat` file on a network drive (for testing on a real Amiga) or on the host file system (for testing in an emulator).
 
 If the machine has only chip memory, the runner can still load and run the memory image, as long as the file fits in the largest free chunk of chip memory, but it will not be exitable, nor restartable.
+
+The runner code was written without the use of any AI-based code generation tools, so it should be safe to use as the main executable for your demo in competitions that ban the use of AI.
