@@ -26,7 +26,7 @@ A no-CPU demo takes the form of a raw memory image that specifies the initial co
 
 The memory image is loaded into memory by a [runner](runner) application, which serves as the demo executable. You can use the runner as is or modify it to your liking, but in order to qualify as a no-CPU demo according to this challenge, your chip memory image has to work with the official runner (with the same behavior).
 
-The maximum size of the chip memory image depends on the targeted Amiga chipset: 512k for OCS, 1MB for ECS (or OCS with ECS Agnus and 512k expansion, [likely](https://eab.abime.net/showthread.php?t=120351&page=2) the most common Amiga 500 configuration), and 2MB for AGA.
+The maximum size of the chip memory image depends on the targeted Amiga chipset: 512k for OCS, 1MB for ECS (or OCS with ECS Agnus and 512k expansion, [likely](https://eab.abime.net/showpost.php?p=1760279&postcount=26) the most common Amiga 500 configuration), and 2MB for AGA.
 
 The audio filter is disabled. Since the filter is controlled via the CIA registers, which the copper does not have access to, the demo does not have the option of enabling the filter.
 
