@@ -62,7 +62,7 @@ Demos made using Copper Showdown are compatible with the [runner](runner), meani
 
 I have had the idea of a no-CPU Amiga demo competition for several years and mentioned it publicly for the first time [in 2021](https://www.pouet.net/topic.php?which=12123&page=2#c570253).
 
-[A](https://www.pouet.net/prod.php?which=104004) [few](https://www.pouet.net/prod.php?which=104025) [demos](https://www.pouet.net/prod.php?which=104792) [made](https://www.pouet.net/prod.php?which=105008) using Copper Showdown have been released in 2025, independently of this challenge.
+[A](https://www.pouet.net/prod.php?which=104004) [few](https://www.pouet.net/prod.php?which=104025) [demos](https://www.pouet.net/prod.php?which=104792) [made](https://www.pouet.net/prod.php?which=105008) [using](https://www.pouet.net/prod.php?which=105127) Copper Showdown have been released in 2025, independently of this challenge.
 
 A blitter implementation of Game of Life was made by Tomas Rokicki [in 1986](https://usenet.trashworldnews.com/?thread=245812). In 2024, [Piru](https://github.com/piruhttps://github.com/piru) released a [proof-of-concept implementation](https://infosec.exchange/@harrysintonen/112627238742582618) driven by the copper without CPU involvement, demonstrating the Turing completeness of the copper/blitter system.
 
