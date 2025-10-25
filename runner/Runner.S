@@ -451,7 +451,7 @@ SwapChipMemoryIn:
 	move.l	ExtraBufferSize(pc),d1
 	bsr	SwapMemory
 
-	move.l	ChipMemorySize(pc),a0
+	move.l	ChipMemorySize(pc),a1
 	bsr	Decompress
 
 	move.l	ChipDataSize(pc),a1
@@ -547,8 +547,8 @@ BootstrapSupervisorCore:
 	bsr	BlitCopy
 .notfakechip:
 	; Decompress if compressed
-	move.l	ChipMemorySize(pc),a0
-	lea	-BOOTSTRAP_SIZE(a0),a0
+	move.l	ChipMemorySize(pc),a1
+	lea	-BOOTSTRAP_SIZE(a1),a1
 	bsr	Decompress
 
 	; Clear until bootstrap code
@@ -582,21 +582,21 @@ BootstrapSupervisorCore:
 
 BlitClear:
 	; A1 = Destination
-	; D1 = Size in bytes (must be even)
+	; D1 = Size in bytes (must be even, negative for descending)
 	move.w	#$0100,d0
 	bra.b	Blit
 
 BlitCopy:
 	; A0 = Source
 	; A1 = Destination
-	; D1 = Size in bytes (must be even)
+	; D1 = Size in bytes (must be even, negative for descending)
 	move.w	#$09f0,d0
 	bra.b	Blit
 
 BlitSwap:
 	; A0 = Source
 	; A1 = Destination
-	; D1 = Size in bytes (must be even)
+	; D1 = Size in bytes (must be even, negative for descending)
 	move.w	#$0b5a,d0
 	bsr	Blit
 	exg.l	a0,a1
@@ -605,11 +605,17 @@ BlitSwap:
 Blit:
 	; A0 = Source
 	; A1 = Destination
-	; D1 = Size in bytes (must be even)
+	; D1 = Size in bytes (must be even, negative for descending)
 	; D0 = BLTCON0
+	moveq.l	#$0000,d3
+	move.l	d1,d2
+	bpl.b	.ascending
+	neg.l	d2
+	moveq.l	#$0002,d3
+.ascending:
 	bsr	WaitBlit
 	move.w	d0,bltcon0(a3)
-	move.w	#$0000,bltcon1(a3)
+	move.w	d3,bltcon1(a3)
 	move.l	#$ffffffff,bltafwm(a3)
 	move.l	a1,bltcpt(a3)
 	move.l	a0,bltapt(a3)
@@ -618,7 +624,6 @@ Blit:
 	move.w	#0,bltamod(a3)
 	move.w	#0,bltdmod(a3)
 
-	move.l	d1,d2
 	asr.l	#1,d2
 	bra.b	.bigin
 .big:	move.w	#0,bltsize(a3)
@@ -652,22 +657,29 @@ WaitBlit:
 
 
 Decompress:
-	; A0 = End of space
+	; A1 = End of space
 
 	move.l	Compressed(pc),d0
 	beq.b	.not
 
-	move.l	ChipDataSize(pc),d0
-	addq.l	#3,d0
-	and.w	#-4,d0
-	move.l	d0,a1
+	; Size of blit for moving compressed data
+	move.l	ChipDataSize(pc),d1
+	addq.l	#1,d1
+	and.w	#-2,d1
 
-.move:	move.l	-(a1),-(a0)
-	move.l	a1,d0
-	bne.b	.move
+	; Blit the data in descending mode
+	move.l	d1,a0
+	subq.l	#2,a0
+	subq.l	#2,a1
+	neg.l	d1
+	bsr	BlitCopy
 
+	; Decompress to the start of chip memory
+	lea	2(a1,d1.l),a0
+	lea	CHIP_MEMORY_ADDRESS,a1
 	bsr	zx0_decompress
 
+	; End of decompressed data is the new chip data size
 	lea	ChipDataSize(pc),a0
 	move.l	a1,(a0)
 .not:
