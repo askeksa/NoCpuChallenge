@@ -173,7 +173,7 @@ NoExit:
 	move.l	#FAKEFAST_ADDRESS+HALF_MEG,a1
 .notfakechip:
 	lea	BootstrapSupervisorCore-Bootstrap_End(a1),a5
-	moveq.l	#BOOTSTRAP_SIZE/4-1,d1
+	move.w	#BOOTSTRAP_SIZE/4-1,d1
 .copy:	move.l	-(a0),-(a1)
 	dbf	d1,.copy
 
@@ -677,8 +677,14 @@ Decompress:
 	; Decompress to the start of chip memory
 	lea	2(a1,d1.l),a0
 	lea	CHIP_MEMORY_ADDRESS,a1
-	bsr	zx0_decompress
-
+	move.l	FakeChip(pc),d1
+	beq.b	.plain
+	lea	HALF_MEG,a4
+	lea	FAKEFAST_ADDRESS,a5
+	bsr	zx0_decompress_split
+	bra.b	.done
+.plain:	bsr	zx0_decompress
+.done:
 	; End of decompressed data is the new chip data size
 	lea	ChipDataSize(pc),a0
 	move.l	a1,(a0)
@@ -686,7 +692,6 @@ Decompress:
 	rts
 
 	include	NC:runner/unzx0_68000.S
-
 
 DummyCopper:
 	dc.l	$fffffffe
