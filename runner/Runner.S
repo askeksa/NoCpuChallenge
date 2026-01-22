@@ -76,7 +76,7 @@ Main:
 	; Check that chip buffer is at least as big as low memory
 	move.l	ChipBufferSize(pc),d0
 	cmp.l	ChipBuffer(pc),d0
-	blt.b	Exit
+	blt.w	Exit
 
 	; Allocate largest available fakefast memory chunk
 	move.l	FakeChip(pc),d1
@@ -121,7 +121,14 @@ Main:
 	move.l	RestartFlag(pc),d0
 	beq.b	.norestart
 
+	; Enable disk DMA in case reload is from floppy
+	move.w	#$8010,dmacon(a3)
+
 	bsr	LoadChipDataFile
+
+	; Disable disk DMA after loading
+	move.w	#$0010,dmacon(a3)
+
 	move.l	ReturnCode(pc),d0
 	beq.b	.restart
 
@@ -357,7 +364,7 @@ OpenSystem:
 	bsr	WaitVbl
 
 	; Enable DMA
-	move.w	#$83e0,dmacon(a3)
+	move.w	#$83f0,dmacon(a3)
 
 	; Restore system view
 	move.l	SystemView(pc),a1
