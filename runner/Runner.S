@@ -4,6 +4,7 @@ MEMORY_REGION_MASK = $FFF80000
 HALF_MEG = $80000
 ONE_MEG = $100000
 FAKEFAST_ADDRESS = $C00000
+FASTZERO_SIZE = $8000
 INITIAL_COPPER_ADDRESS = $000000
 
 TEXT_BUFFER_SIZE = 1000
@@ -448,6 +449,14 @@ StopDemo:
 	rts
 
 SwapChipMemoryIn:
+	; With tools like MuMove4K/MuFastZero, up to 32 kilobytes
+	; starting at address 0 may be mapped to fast memory.
+	; Copy the CPU memory to chip memory to be sure.
+	move.l	#CHIP_MEMORY_ADDRESS,a0
+	move.l	a0,a1
+	move.l	#FASTZERO_SIZE,d1
+	bsr	CopyFromCPUToBlitter
+
 	move.l	ChipBufferSize(pc),a0
 	move.l	#CHIP_MEMORY_ADDRESS,a1
 	move.l	ChipBuffer(pc),d1
@@ -458,9 +467,18 @@ SwapChipMemoryIn:
 	move.l	ExtraBufferSize(pc),d1
 	bsr	SwapMemory
 
+	; Decompress if compressed
+	move.l	Compressed(pc),d0
+	beq.b	.notcompressed
 	move.l	ChipMemorySize(pc),a1
 	bsr	Decompress
 
+	; Copy the CPU memory to chip memory again after decompression.
+	move.l	#CHIP_MEMORY_ADDRESS,a0
+	move.l	a0,a1
+	move.l	#FASTZERO_SIZE,d1
+	bsr	CopyFromCPUToBlitter
+.notcompressed:
 	move.l	ChipDataSize(pc),a1
 	move.l	ChipMemorySize(pc),d1
 	sub.l	a1,d1
@@ -476,7 +494,7 @@ SwapChipMemoryOut:
 	move.l	ChipBufferSize(pc),a0
 	move.l	#CHIP_MEMORY_ADDRESS,a1
 	move.l	ChipBuffer(pc),d1
-	bsr	BlitCopy
+	bsr	CopyMemory
 	rts
 
 CopyMemory:
@@ -497,6 +515,23 @@ SwapMemory:
 .loop:	move.l	(a0),d0
 	move.l	(a1),(a0)+
 	move.l	d0,(a1)+
+.in:	subq.l	#4,d1
+	bge.b	.loop
+	rts
+
+CopyFromCPUToBlitter:
+	; A0 = Source
+	; A1 = Dest
+	; D1 = Size
+	bsr	WaitBlit
+	move.l	#$01f00000,bltcon0(a3)
+	move.l	a1,bltdpt(a3)
+	move.w	#0,bltdmod(a3)
+	move.w	#$ffff,bltadat(a3)
+	bra.b	.in
+.loop:	move.l	(a0)+,bltafwm(a3)
+	move.w	#(1<<6)+2,bltsize(a3)
+	bsr	WaitBlit
 .in:	subq.l	#4,d1
 	bge.b	.loop
 	rts
@@ -554,10 +589,12 @@ BootstrapSupervisorCore:
 	bsr	BlitCopy
 .notfakechip:
 	; Decompress if compressed
+	move.l	Compressed(pc),d0
+	beq.b	.notcompressed
 	move.l	ChipMemorySize(pc),a1
 	lea	-BOOTSTRAP_SIZE(a1),a1
 	bsr	Decompress
-
+.notcompressed:
 	; Clear until bootstrap code
 	move.l	ChipDataSize(pc),a1
 	move.l	ChipMemorySize(pc),d1
@@ -666,9 +703,6 @@ WaitBlit:
 Decompress:
 	; A1 = End of space
 
-	move.l	Compressed(pc),d0
-	beq.b	.not
-
 	; Size of blit for moving compressed data
 	move.l	ChipDataSize(pc),d1
 	addq.l	#1,d1
@@ -695,7 +729,6 @@ Decompress:
 	; End of decompressed data is the new chip data size
 	lea	ChipDataSize(pc),a0
 	move.l	a1,(a0)
-.not:
 	rts
 
 	include	NC:runner/unzx0_68000.S
