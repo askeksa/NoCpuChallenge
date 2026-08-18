@@ -4,11 +4,11 @@ This is an open challenge to create demos that run entirely on the Amiga custom 
 
 This repository contains the rules of the challenge and a [runner](runner) application for launching no-CPU demos. This is intended as a standard specification of the no-CPU platform for demo competitions.
 
-There will be a dedicated no-CPU Amiga demo competition at [**Gerp 2026**](https://gerp.nu/), January 23-25, 2026. In addition, this is an ongoing challenge &mdash; an invitation to explore a different kind of demo platform.
+There is an annual, dedicated no-CPU Amiga demo competition taking place at the [**Gerp**](https://gerp.nu/) demoparty in Skövde, Sweden. In addition, this is an ongoing challenge &mdash; an invitation to explore a different kind of demo platform.
 
 An [invitation demo](https://www.pouet.net/prod.php?which=104753) &mdash; itself a no-CPU demo &mdash; was released at **Evoke 2025**. The full source code for the demo is available [here](https://github.com/askeksa/NoCpuDemo). I also guested [h0ffman's weekly live stream](https://www.twitch.tv/djh0ffman) to talk about the demo and the challenge. You can watch the recording of our conversation [on YouTube](https://youtu.be/M5olYsUhPqg).
 
-Whenever you release a no-CPU demo, you are encouraged to write a comment about it on the [demo announcement issue](https://github.com/askeksa/NoCpuChallenge/issues/1).
+A [Pouet list](https://www.pouet.net/lists.php?which=331) is maintained of all no-CPU demos released so far.
 
 There's also a [FAQ](faq.md).
 
