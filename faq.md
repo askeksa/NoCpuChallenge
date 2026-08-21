@@ -56,7 +56,7 @@ Copper Showdown is based on a similar idea &mdash; making demo effects that run 
 
 The two projects were conceived independently at almost the same time, in February/March 2024.
 
-Demos made using Copper Showdown are compatible with the [runner](runner), meaning that the Copper Showdown Editor can be used as a tool to create demos for this challenge. At the time of this writing, exporting a memory image has to be done manually in the Lua code, but an export feature in the editor is planned.
+Demos made using Copper Showdown are compatible with the [runner](runner), meaning that the Copper Showdown Editor can be used as a tool to create demos for this challenge. If you export your Copper Showdown Editor project using **File / Export as Raw Memory**, the resulting file will work as the `chip.dat` file for the no-CPU runner.
 
 ## Is this a new idea, or have no-CPU demos been made in the past?
 
